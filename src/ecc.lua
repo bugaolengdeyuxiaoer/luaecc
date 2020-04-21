@@ -4,7 +4,6 @@
 --- DateTime: 2020/4/3 15:57
 ---
 local bit = require("bit")
-local uint64 = {0,0}
 local number_ecc_digits = 16
 local number_ecc_bytes = 32
 local max_tries = 16
@@ -24,7 +23,7 @@ end
 --                 0x9C47D08F,0xFB10D4B8,0xFD17B448,0xA6855419,0x5DA4FBFC,0x0E1108A8,0x483ADA77,0x25A3C465}
 --local Curve_N = {0xBFD25E8C,0xD0364141,0xBAAEDCE6,0xAF48A038,0xFFFFFFFF,0xFFFFFFFE,0xFFFFFFFF,0xFFFFFFFF}
 
- Curve_P = {0xFC2F,0xFFFF,0xFFFE,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF}
+local Curve_P = {0xFC2F,0xFFFF,0xFFFE,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF}
 local Curve_B = {0x0007,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000}
 local Curve_G = {x = {0x1798,0x16F8,0x815B,0x59F2,0x28D9,0x2DCE,0xFCDB,0x029B,0x0B07,0xCE87,0x6295,0x55A0,0xBBAC,0xF9DC,0x667E,0x79BE},
                 y = {0xD4B8,0xFB10,0xD08F,0x9C47,0x5419,0xA685,0xB448,0xFD17,0x08A8,0x0E11,0xFBFC,0x5DA4,0xC465,0x26A3,0xDA77,0x483A}}
@@ -37,13 +36,12 @@ function mod_sqrt(a)
     vli_clear(l_result)
     l_result [1] = 1
     --Since Curve_P == 3 (mod 4) for all supported curves, we can
-    --compute sqrt(a) = a^((Curve_P + 1) / 4) (mod Curve_P). */
-    vli_add(p1, Curve_P, p1) -- p1 = Curve_P + 1 */
+    --compute sqrt(a) = a^((Curve_P + 1) / 4) (mod Curve_P). 
+    vli_add(p1, Curve_P, p1) -- p1 = Curve_P + 1 
     for i = vli_numBits(p1) - 1 , 2,-1 do
 
         vli_modSquare_fast(l_result, l_result)
-        if(vli_testBit(p1, i)) then
-
+        if(vli_isZero(vli_testBit(p1, i))~= true) then
             vli_modMult_fast(l_result, l_result, a)
         end
     end
@@ -55,9 +53,9 @@ function ecc_point_decompress(p_point, p_compressed)
         l_tmp[i] = p_compressed[i+1]
     end
     ecc_bytes2native(p_point.x,l_tmp)
-    vli_modSquare_fast(p_point.y, p_point.x) -- y = x^2 */
-    vli_modMult_fast(p_point.y, p_point.y,p_point.x) -- y = x^3 */
-    vli_modAdd(p_point.y, p_point.y, Curve_B, Curve_P) -- y = x^3 + 7 */
+    vli_modSquare_fast(p_point.y, p_point.x) -- y = x^2 
+    vli_modMult_fast(p_point.y, p_point.y,p_point.x) -- y = x^3 
+    vli_modAdd(p_point.y, p_point.y, Curve_B, Curve_P) -- y = x^3 + 7 
     mod_sqrt(p_point.y)
     if(bit.band(p_point.y[1] , 0x01)) ~= bit.band(p_compressed[1] , 0x01) then
         vli_sub(p_point.y, Curve_P, p_point.y)
@@ -88,32 +86,32 @@ function ecdsa_verify(p_publicKey, p_hash, p_signature)
     ecc_bytes2native(l_s, l_tmp)
 
     if(vli_isZero(l_r) or vli_isZero(l_s)) then
-        -- r, s must not be 0. */
-        return 0
+        -- r, s must not be 0. 
+        return false
     end
 
-    if(vli_cmp(Curve_N, l_r) ~= 1 or vli_cmp(Curve_N, l_s) ~= 1) then
-        -- r, s must be < n. */
-        return 0
+    if vli_cmp(Curve_N, l_r) ~= 1 or vli_cmp(Curve_N, l_s) ~= 1 then
+        -- r, s must be < n. 
+        return false
     end
 
-    -- Calculate u1 and u2. */
-    vli_modInv(z, l_s, Curve_N) -- Z = s^-1 */
+    -- Calculate u1 and u2. 
+    vli_modInv(z, l_s, Curve_N) -- Z = s^-1 
     ecc_bytes2native(u1, p_hash)
-    vli_modMult(u1, u1, z, Curve_N) -- u1 = e/s */
-    vli_modMult(u2, l_r, z, Curve_N) -- u2 = r/s */
+    vli_modMult(u1, u1, z, Curve_N) -- u1 = e/s 
+    vli_modMult(u2, l_r, z, Curve_N) -- u2 = r/s 
 
-    -- Calculate l_sum = G + Q. */
+    -- Calculate l_sum = G + Q. 
     vli_set(l_sum.x, l_public.x)
     vli_set(l_sum.y, l_public.y)
     vli_set(tx, Curve_G.x)
     vli_set(ty, Curve_G.y)
-    vli_modSub(z, l_sum.x, tx, Curve_P) -- Z = x2 - x1 */
+    vli_modSub(z, l_sum.x, tx, Curve_P) -- Z = x2 - x1 
     XYcZ_add(tx, ty, l_sum.x, l_sum.y)
-    vli_modInv(z, z, Curve_P) -- Z = 1/Z */
+    vli_modInv(z, z, Curve_P) -- Z = 1/Z 
     apply_z(l_sum.x, l_sum.y, z)
 
-    -- Use Shamir's trick to calculate u1*G + u2*Q */
+    -- Use Shamir's trick to calculate u1*G + u2*Q 
     local l_points = {}
     l_points[1]  = nil
     l_points[2]  = Curve_G
@@ -132,23 +130,22 @@ function ecdsa_verify(p_publicKey, p_hash, p_signature)
     else
         c2 = 1
     end
-
-    local l_point = l_points[bit.bor((c1) , bit.lshift(c2, 1))+1]
+    local l_point = l_points[bit.bor(c1 , bit.lshift(c2, 1))+1]
     vli_set(rx, l_point.x)
     vli_set(ry, l_point.y)
     vli_clear(z)
-    z[0] = 1
+    z[1] = 1
 
-    for i = l_numBits - 2 ,1 ,-1 do
+    for i = l_numBits - 1 ,1 ,-1 do
         eccPoint_double_jacobian(rx, ry, z)
         local c1
-        if vli_isZero(vli_testBit(u1, i)) then
+        if vli_isZero(vli_testBit(u1, i-1)) then
             c1 = 0
         else
             c1 = 1
         end
         local c2
-        if vli_isZero(vli_testBit(u2, i)) then
+        if vli_isZero(vli_testBit(u2, i-1)) then
             c2 = 0
         else
             c2 = 1
@@ -159,21 +156,20 @@ function ecdsa_verify(p_publicKey, p_hash, p_signature)
             vli_set(tx, l_point.x)
             vli_set(ty, l_point.y)
             apply_z(tx, ty, z)
-            vli_modSub(tz, rx, tx, Curve_P) -- Z = x2 - x1 */
+            vli_modSub(tz, rx, tx, Curve_P) -- Z = x2 - x1 
             XYcZ_add(tx, ty, rx, ry)
             vli_modMult_fast(z, z, tz)
         end
     end
-
-    vli_modInv(z, z, Curve_P) -- Z = 1/Z */
+    vli_modInv(z, z, Curve_P) -- Z = 1/Z 
     apply_z(rx, ry, z)
 
-    -- v = x1 (mod n) */
+    -- v = x1 (mod n) 
     if(vli_cmp(Curve_N, rx) ~= 1) then
         vli_sub(rx, rx, Curve_N)
     end
 
-    -- Accept only if v == r. */
+    -- Accept only if v == r. 
     return (vli_cmp(rx, l_r) == 0)
 end
 function getRandomNumber(p_vli)
@@ -267,12 +263,7 @@ function eccPoint_mult(p_result,p_point,p_scalar,p_initialZ)
     vli_set(Rx[2],p_point.x)
     vli_set(Ry[2],p_point.y)
     XYcZ_initial_double(Rx[2],Ry[2],Rx[1],Ry[1],p_initialZ)
-    --print("p_scalar = ",vli_numBits(p_scalar))
-    --collectgarbage("collect")
-    --local s1 = collectgarbage("count")
-    --print("---------s1",s1)
     for i = vli_numBits(p_scalar)-1,2,-1 do
-        --print(i)
         if vli_isZero(vli_testBit(p_scalar,i-1))  then
             nb = 1
         else
@@ -348,9 +339,6 @@ end
 function vli_numBits(p_vli)
     local i = 0
     local l_digit = 0
-    --for i = 1 ,number_ecc_digits do
-    --    print(p_vli[i]..",")
-    --end
     local l_numDigits = vli_numDigits(p_vli)
     if(l_numDigits == 0) then
         return 0
@@ -422,15 +410,6 @@ function vli_lshift(p_result,p_in,p_shift)
     end
     return l_carry
 end
---function vli_rshift(p_result,p_in,p_shift)
---    local l_carry = 0
---    for i = number_ecc_digits,1,-1 do
---        local l_temp = p_in[i]
---        p_result[i] = bit.bor(bit.rshift(l_temp,p_shift),l_carry)
---        l_carry = bit.lshift(l_temp,16-p_shift)
---    end
---    return l_carry
---end
 --rshift 1 bit
 function vli_rshift1(p_in)
     local l_carry = 0
@@ -519,7 +498,6 @@ function vli_square(p_result,p_left)
             end
             local l_product = p_left[i] * p_left[k-i+1]
             if i <= k - i then
-                --r2 = r2 + bit.rshift(l_product,31)
                 l_product = l_product*2
             end
             r01  =r01 + l_product
@@ -565,40 +543,29 @@ function vli_mmod_fast(p_result,p_product)
     end
     local l_tmp = {}
     vli_mult(l_tmp,p_temp_array,p_product_right)
-    --    printf("after mult\n")
-    --    for (int i =0i<8i++)
-    --        printf("%llu\n",l_tmp[i])
     if vli_cmp(p_product,Curve_P)>=0 then
         vli_sub(p_product,p_product,Curve_P)
     end
-    --将p_product的低四位与l_tmp的低四位做加法，进位存放在l_tmp【4】中
     l_carry = vli_add(p_product,l_tmp,p_product)
     l_tmp[17] = l_tmp[17] + l_carry
 
 
     local aa = {}
-    --l_tmp的高四位存放在 aa中
     for i = 1,16 do
         aa[i] = l_tmp[i+16]
     end
     for  i = 1 ,32 do
         l_tmp[i] = 0
     end
-    --R * l_tmp的高四位（aa）
     vli_mult(l_tmp,p_temp_array,aa)
-    --将l_tmp 和product相加
     l_carry = vli_add(p_product,l_tmp,p_product)
-    --处理p_product的加法进位
     while l_carry >0 do
-    --这里加过后仍有可能会进位。
     l_carry  = l_carry + vli_add(p_product,p_product,p_temp_array)
     l_carry =l_carry -1
     end
-    --保证小于 2^256后仍可能大于 Curve_P
     if vli_cmp(p_product,Curve_P)>=0 then
     vli_sub(p_product,p_product,Curve_P)
     end
-    --赋值
     for  i = 1,16 do
         p_result[i] = p_product[i]
     end
@@ -765,14 +732,14 @@ function eccPoint_double_jacobian(X1,Y1,Z1)
         return
     end
 
-    vli_modSquare_fast(t5, Y1)   --t5 = y1^2 */
-    vli_modMult_fast(t4, X1, t5) --t4 = x1*y1^2 = A */
-    vli_modSquare_fast(X1, X1)   --t1 = x1^2 */
-    vli_modSquare_fast(t5, t5)   --t5 = y1^4 */
-    vli_modMult_fast(Z1, Y1, Z1) --t3 = y1*z1 = z3 */
+    vli_modSquare_fast(t5, Y1)   --t5 = y1^2 
+    vli_modMult_fast(t4, X1, t5) --t4 = x1*y1^2 = A 
+    vli_modSquare_fast(X1, X1)   --t1 = x1^2 
+    vli_modSquare_fast(t5, t5)   --t5 = y1^4 
+    vli_modMult_fast(Z1, Y1, Z1) --t3 = y1*z1 = z3 
 
-    vli_modAdd(Y1, X1, X1, Curve_P) --t2 = 2*x1^2 */
-    vli_modAdd(Y1, Y1, X1, Curve_P) --t2 = 3*x1^2 */
+    vli_modAdd(Y1, X1, X1, Curve_P) --t2 = 2*x1^2 
+    vli_modAdd(Y1, Y1, X1, Curve_P) --t2 = 3*x1^2 
 
     if vli_isZero(vli_testBit(Y1,0)) ~= true then
         local l_carry = vli_add(Y1,Y1,Curve_P)
@@ -783,13 +750,13 @@ function eccPoint_double_jacobian(X1,Y1,Z1)
     end
     --t1 = 3/2*(X1^2-Z1^4) = B
 
-    vli_modSquare_fast(X1, Y1)                     --t1 = B^2 */
-    vli_modSub(X1, X1, t4, Curve_P) --t1 = B^2 - A */
-    vli_modSub(X1, X1, t4, Curve_P) --t1 = B^2 - 2A = x3 */
+    vli_modSquare_fast(X1, Y1)                     --t1 = B^2 
+    vli_modSub(X1, X1, t4, Curve_P) --t1 = B^2 - A 
+    vli_modSub(X1, X1, t4, Curve_P) --t1 = B^2 - 2A = x3 
 
-    vli_modSub(t4, t4, X1, Curve_P) --t4 = A - x3 */
-    vli_modMult_fast(Y1, Y1, t4)                   --t2 = B * (A - x3) */
-    vli_modSub(Y1, Y1, t5, Curve_P) --t2 = B * (A - x3) - y1^4 = y3 */
+    vli_modSub(t4, t4, X1, Curve_P) --t4 = A - x3 
+    vli_modMult_fast(Y1, Y1, t4)                   --t2 = B * (A - x3) 
+    vli_modSub(Y1, Y1, t5, Curve_P) --t2 = B * (A - x3) - y1^4 = y3 
 end
 function eccPoint_isZero(p_point)
     return vli_isZero(p_point.x) or vli_isZero(p_point.y)
@@ -803,18 +770,14 @@ end
 
 function ecdsa_sign(p_privateKey ,p_hash,p_signature)
     local k ={}
-    local l_tmp ={}
     local s ={}
     local tmp ={}
-    local l_s ={}
     local l_tries = 1
     local signature = {}
     local signature1 = {}
-    local k2 = {}
     local p = EccPoint.new()
     while true do
-        --getRandomNumber(k)
-        ecc_bytes2native(k,string.bytes("12345687424321343253432414123123",1,32))
+        getRandomNumber(k)
         if  l_tries >=max_tries then
             return 0
         end
@@ -827,45 +790,29 @@ function ecdsa_sign(p_privateKey ,p_hash,p_signature)
         l_tries =  l_tries +1
     end
 
-    --local l_carry = regulark(l_tmp,l_tmp2,k)
-    --if l_carry == 1 then
-    --    eccPoint_mult(p, Curve_G, l_tmp2, nil )
-    --else
-    --    eccPoint_mult(p, Curve_G, l_tmp, nil )
-    --end
-        eccPoint_mult(p, Curve_G, k, nil )
+    eccPoint_mult(p, Curve_G, k, nil )
 
     if vli_isZero(p.x)  then
         return 0
     end
 
-    --repeat
-    --    getRandomNumber(tmp)
-    --until vli_isZero(tmp) ~= true and vli_cmp(Curve_N,tmp)==1
     for i = 1 ,number_ecc_digits do
         tmp [i] = 0x3131
     end
 
-    vli_modMult(k, k, tmp, Curve_N) -- k' = rand * k */
-    vli_modInv(k, k, Curve_N)       -- k = 1 / k' */
-    vli_modMult(k, k, tmp, Curve_N) -- k = 1 / k */
+    vli_modMult(k, k, tmp, Curve_N) -- k' = rand * k 
+    vli_modInv(k, k, Curve_N)       -- k = 1 / k' 
+    vli_modMult(k, k, tmp, Curve_N) -- k = 1 / k 
 
-    ecc_native2bytes(signature, p.x) -- store r */
-    ecc_bytes2native(tmp, p_privateKey) -- tmp = d */
+    ecc_native2bytes(signature, p.x) -- store r 
+    ecc_bytes2native(tmp, p_privateKey) -- tmp = d 
 
-    --s[16] = 0
     vli_set(s, p.x)
-    vli_modMult(s, tmp, s, Curve_N) -- s = r*d */
-
-
+    vli_modMult(s, tmp, s, Curve_N) -- s = r*d 
     ecc_bytes2native(tmp,p_hash)
-    for i = 1 ,number_ecc_digits do
-        print(tmp[i])
-    end
-    vli_modAdd(s, tmp, s, Curve_N) -- s = e + r*d */
-    vli_modMult(s, s, k, Curve_N)  -- s = (e + r*d) / k */
+    vli_modAdd(s, tmp, s, Curve_N) -- s = e + r*d 
+    vli_modMult(s, s, k, Curve_N)  -- s = (e + r*d) / k 
     ecc_native2bytes(signature1, s)
-
     for i = 1 ,32 do
         p_signature[i] = signature[i]
     end
@@ -882,30 +829,32 @@ function regulark(k2,k1,k)
     vli_add(k2, k1, Curve_N)
     return l_carry
 end
---function bits2int (native,bits)
---    vli_clear(native)
---    ecc_bytes2native(native,bits)
---    local shift = 0
---
---    uECC_vli_clear(native)
---    uECC_vli_bytesToNative(native, bits, bits_size)
---    if (bits_size * 8 <= (unsigned)curve->num_n_bits) then
---        return
---    end
---    shift = bits_size * 8 - curve->num_n_bits
---    carry = 0
---    ptr = native + num_n_words
---    while (ptr-- > native) {
---    uECC_word_t temp = *ptr
---    *ptr = (temp >> shift) | carry
---    carry = temp << (uECC_WORD_BITS - shift)
---    }
---
---    -- Reduce mod Curve_N */
---    if (uECC_vli_cmp_unsafe(curve->n, native, num_n_words) != 1) {
---    uECC_vli_sub(native, native, curve->n, num_n_words)
---    }
---end
+function bytes2hex(bytes)
+
+    local str = ""
+    for i = 1,#bytes do
+        str = str .. string.format("%x",bytes[i]/16)
+        str = str .. string.format("%x",bytes[i]%16)
+    end
+    return str
+end
+function hex2bytes(hex)
+    if #hex %2 == 1 then
+        return nil
+    end
+    local bytes = ""
+    for i = 1,math.floor(#hex/2) do
+        bytes[i] = string.format("%d",string.sub(hex,2*i-1,2*i-1))*16 + string.format("%d",string.sub(hex,i*2,i*2))
+    end
+    return bytes
+end
+function str2bytes(str)
+    local bytes = {}
+    for i = 1,#str do
+        bytes[i] = string.byte(str,i,i)
+    end
+    return bytes
+end
 --p_publicKey is 65 len byte array  p_privateKey is 32 len byte array
 function ecc_make_key(p_publicKey,p_privateKey)
 
@@ -918,8 +867,6 @@ function ecc_make_key(p_publicKey,p_privateKey)
         if  l_tries >=max_tries then
             return 0
         end
-        ecc_bytes2native(l_private,string.bytes("11111111111111111111111111111111",1,32))
-        --ecc_bytes2native(l_private,string.bytes("12345898767232323214151353564567",1,32))
         if vli_isZero(l_private) ~= true then
             if (vli_cmp(Curve_N,l_private) ~= 1) then
                 vli_sub(l_private,l_private,Curve_N)
@@ -930,25 +877,11 @@ function ecc_make_key(p_publicKey,p_privateKey)
             end
         end
     end
-    --local pubstr = "0"..2+bit.band(l_public.y[1],1)
-    --pubstr = pubstr .. ecc_native2hex(l_public.x)
-    --pubstr = pubstr .. ecc_native2hex(l_public.y)
-
-    local privstr = ecc_native2hex(l_private)
+    ecc_native2bytes(p_privateKey,l_private)
     local pubbytes1 = {}
-    local pubbytes = {}
-    pubbytes[1] = 2+bit.band(l_public.y[1],1)
+    p_publicKey[1] = 2+bit.band(l_public.y[1],1)
     ecc_native2bytes(pubbytes1,l_public.x)
     for i = 1 ,32 do
-        pubbytes[i+1] = pubbytes1[i]
-    end
-    return pubbytes,privstr
-end
-
-function string:bytes(all)
-    if all then
-        return { self:byte(1, -1) }
-    else
-        return byteIter, { t = self, i = 0 }
+        p_publicKey[i+1] = pubbytes1[i]
     end
 end
