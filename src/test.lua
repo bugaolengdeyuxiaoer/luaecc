@@ -24,7 +24,6 @@ print(bytes2hex(priv))
 print(bytes2hex(pub))
 ecdsa_sign(priv,hash,signature)
 local sigstr = ""
---print(ecc_bytes2hex(signature))
 
 for i = 1,64 do
     sigstr = sigstr ..string.format("%x",signature[i]/16)
