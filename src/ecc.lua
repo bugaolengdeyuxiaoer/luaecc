@@ -3,6 +3,7 @@
 --- Created by yj.
 --- DateTime: 2020/4/3 15:57
 ---
+
 local bit = require("bit")
 local number_ecc_digits = 16
 local number_ecc_bytes = 32
